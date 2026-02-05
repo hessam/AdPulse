@@ -6,10 +6,15 @@ export interface CampaignData {
     channelType: string;
     biddingStrategyType: string;
     dailyBudget: number;
+    totalBudget: number;
+    targetCpa: number | null;
+    targetRoas: number | null;
     impressions: number;
     clicks: number;
     cost: number;
     conversions: number;
+    conversionsValue: number;
+    conversionRate: number;
     ctr: number;
     avgCpc: number;
 }

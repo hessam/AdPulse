@@ -3,18 +3,21 @@ import { CredentialsForm } from './components/CredentialsForm';
 import { CampaignTable } from './components/CampaignTable';
 import { AuditResults } from './components/AuditResults';
 import { ExportButton } from './components/ExportButton';
-import { fetchCampaigns, generateAudit } from './services/api';
+import { fetchCampaigns, generateAudit, fetchAllReports, exportToCSV, generateComprehensiveAudit } from './services/api';
 import type { Credentials, CampaignData, AuditResult } from './types';
+import type { AllReportsData } from './services/api';
 
 type Step = 'credentials' | 'campaigns' | 'audit';
 
 export default function App() {
     const [step, setStep] = useState<Step>('credentials');
     const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingAll, setIsFetchingAll] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const [credentials, setCredentials] = useState<Credentials | null>(null);
     const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
+    const [allReports, setAllReports] = useState<AllReportsData | null>(null);
     const [audit, setAudit] = useState<AuditResult | null>(null);
 
     const handleCredentialsSubmit = async (creds: Credentials) => {
@@ -31,6 +34,28 @@ export default function App() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleFetchAllReports = async () => {
+        if (!credentials) return;
+        setIsFetchingAll(true);
+        setError(null);
+
+        try {
+            const reports = await fetchAllReports(credentials);
+            setAllReports(reports);
+            setCampaigns(reports.campaigns);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch all reports');
+        } finally {
+            setIsFetchingAll(false);
+        }
+    };
+
+    const handleExportCSV = () => {
+        if (!allReports) return;
+        const timestamp = new Date().toISOString().split('T')[0];
+        exportToCSV(allReports, `adpulse_report_${timestamp}.csv`);
     };
 
     const handleGenerateAudit = async () => {
@@ -56,10 +81,34 @@ export default function App() {
         }
     };
 
+    const handleComprehensiveAudit = async () => {
+        if (!credentials || !allReports) return;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const auditResult = await generateComprehensiveAudit(
+                allReports,
+                credentials.openaiApiKey,
+                credentials.startDate && credentials.endDate
+                    ? { startDate: credentials.startDate, endDate: credentials.endDate }
+                    : undefined
+            );
+            setAudit(auditResult);
+            setStep('audit');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to generate comprehensive audit');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleReset = () => {
         setStep('credentials');
         setCredentials(null);
         setCampaigns([]);
+        setAllReports(null);
         setAudit(null);
         setError(null);
     };
@@ -109,10 +158,40 @@ export default function App() {
             {step === 'campaigns' && (
                 <>
                     <CampaignTable campaigns={campaigns} />
+
+                    {/* Report Status */}
+                    {allReports && (
+                        <div className="report-status">
+                            <strong>📊 All Reports Loaded:</strong> {allReports.campaigns.length} campaigns, {allReports.searchTerms.length} search terms, {allReports.qualityScores.length} QS keywords, {allReports.landingPages.length} landing pages
+                        </div>
+                    )}
+
                     <div className="btn-group">
                         <button className="btn btn--secondary" onClick={handleReset}>
                             ← Back
                         </button>
+
+                        <button
+                            className="btn btn--secondary"
+                            onClick={handleFetchAllReports}
+                            disabled={isFetchingAll}
+                        >
+                            {isFetchingAll ? (
+                                <>
+                                    <span className="spinner" />
+                                    Fetching All...
+                                </>
+                            ) : (
+                                <>📥 Fetch All Reports</>
+                            )}
+                        </button>
+
+                        {allReports && (
+                            <button className="btn btn--secondary" onClick={handleExportCSV}>
+                                📄 Export CSV
+                            </button>
+                        )}
+
                         <button
                             className="btn btn--primary"
                             onClick={handleGenerateAudit}
@@ -124,9 +203,26 @@ export default function App() {
                                     Generating Audit...
                                 </>
                             ) : (
-                                <>🤖 Generate AI Audit</>
+                                <>🤖 Quick AI Audit</>
                             )}
                         </button>
+
+                        {allReports && (
+                            <button
+                                className="btn btn--primary"
+                                onClick={handleComprehensiveAudit}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <span className="spinner" />
+                                        Analyzing...
+                                    </>
+                                ) : (
+                                    <>🧠 Full AI Audit</>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </>
             )}
@@ -146,3 +242,4 @@ export default function App() {
         </div>
     );
 }
+

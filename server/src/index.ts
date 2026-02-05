@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import googleAdsRoutes from './routes/googleAds.js';
 import auditRoutes from './routes/audit.js';
+import reportsRoutes from './routes/reports.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -37,6 +38,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/google-ads', googleAdsRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
